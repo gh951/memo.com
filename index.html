@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -649,8 +650,20 @@ function saveCurrent(){
   n.title=titleEl.value; n.content=contentEl.value; if(!n.folderId) n.folderId='default'; n.updated=Date.now();
   dbPut(n).then(function(){
     savedTag.classList.add('show'); setTimeout(function(){savedTag.classList.remove('show');},1400);
-    renderFolders(); renderList();
+    updateCurrentListItem();   /* 목록 전체 재생성 대신 현재 항목만 갱신 (성능) */
   });
+}
+/* 현재 메모의 목록 항목만 제자리 갱신 — 저장할 때마다 전체를 다시 그리지 않도록 */
+function updateCurrentListItem(){
+  if(!currentId) return;
+  var n=notes.find(function(x){return x.id===currentId;}); if(!n) return;
+  var div=listEl.querySelector('.note-item.active'); if(!div) return;
+  var showTag = !!currentQuery() || curFolder==='__all__';
+  var fn = window.t ? window.t(folderName(folderOf(n))) : folderName(folderOf(n));
+  var meta = showTag ? (numf((n.content||'').length)+'자 · '+escapeHtml(fn)) : (numf((n.content||'').length)+'자');
+  var t=div.querySelector('.title'); if(t) t.textContent=deriveTitle(n);
+  var d=div.querySelector('.date'); if(d) d.textContent=fmtDate(n.updated);
+  var m=div.querySelector('.meta'); if(m) m.innerHTML=meta;
 }
 function delNote(id){
   var n=notes.find(function(x){return x.id===id;}); var name=n?deriveTitle(n):'이 메모';
