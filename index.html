@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1036,15 +1035,13 @@ function toggleMic(){
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
   recog.continuous=true; recog.interimResults=true;
   micBase=contentEl.value; if(micBase && !/\n$/.test(micBase)) micBase+='\n';
-  var committed='';
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onend=function(){ recognizing=false; setMicUI(false); };
   recog.onerror=function(ev){ recognizing=false; setMicUI(false); if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')) showToast('마이크 권한을 허용해 주세요'); };
   recog.onresult=function(e){
-    var interim='', fin='';
-    for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else interim+=t; }
-    if(fin) committed+=fin;
-    contentEl.value=micBase+committed+interim;
+    var full='';
+    for(var i=0;i<e.results.length;i++){ full+=e.results[i][0].transcript; }
+    contentEl.value=micBase+full;
     contentEl.dispatchEvent(new Event('input'));
   };
   try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
