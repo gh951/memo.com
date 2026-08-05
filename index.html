@@ -109,9 +109,11 @@
   .note-item .meta{font-size:11px; color:var(--muted); margin-top:3px; padding-right:32px;}
   .note-item .mv{position:absolute; bottom:8px; right:8px; width:27px; height:27px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--muted); cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;}
   .note-item .mv:hover{border-color:var(--accent); color:var(--accent); background:#fff7ed;}
-  .note-item .del{position:absolute; top:9px; right:8px; width:26px; height:26px; border:none; border-radius:7px; background:transparent; color:#f87171; cursor:pointer; font-size:13px; display:none; align-items:center; justify-content:center;}
-  .note-item:hover .del{display:flex;}
-  .note-item .del:hover{background:rgba(248,113,113,.18);}
+  .note-item .del{position:absolute; top:9px; right:8px; width:28px; height:28px; border:none; border-radius:7px; background:rgba(248,113,113,.10); color:#e05a5a; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; opacity:.55;}
+  .note-item:hover .del{opacity:1;}
+  .note-item .del:hover{background:rgba(248,113,113,.22);}
+  @keyframes recblink{0%,100%{background:#b4453a;} 50%{background:#e2897c;}}
+  .btn.rec{animation:recblink .85s infinite; color:#fff!important; border-color:#b4453a!important;}
   .empty-list{padding:26px 16px; text-align:center; color:var(--muted); font-size:12.5px; line-height:1.7;}
 
   /* 에디터 */
@@ -216,6 +218,7 @@
     #hdrTools .btn{flex:1 1 44%;}
     #uiLang{max-width:100%!important; flex:1 1 100%;}
     .note-item{padding:13px 12px;}
+    .note-item .del{opacity:1; width:36px; height:36px; font-size:17px; top:8px; right:8px;}
     .folder-item{padding:11px 10px;}
     .ed-foot .btn{padding:8px 12px;}
   }
@@ -237,7 +240,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장</span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -253,6 +256,7 @@
   <button class="btn ghost" id="saveTxtBtn">💾 TXT</button>
   <button class="btn ghost" id="exportBtn">⬇ 전체 백업</button>
   </div>
+  <button class="btn" id="voiceBtn" title="누르면 새 음성 메모가 열리고 바로 받아쓰기가 시작돼요" style="background:#e9f1f8; border:1px solid #bcd3e7; color:#1f4e79; font-weight:800;">🎤 음성 메모</button>
   <button class="btn primary" id="newBtn">＋ 새 메모</button>
 </header>
 
@@ -1025,7 +1029,10 @@ $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.cl
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
 var recog=null, recognizing=false, micBase='';
-function setMicUI(on){ var b=$('micBtn'); if(!b) return; b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; }
+function setMicUI(on){
+  var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
+  var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
+}
 function toggleMic(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
@@ -1047,6 +1054,16 @@ function toggleMic(){
   try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
 }
 $('micBtn').onclick=toggleMic;
+/* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
+function startVoiceMemo(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
+  if(recognizing){ try{ recog.stop(); }catch(e){} return; }
+  setFolder('voice'); newNote();
+  if(window.innerWidth<=640){ COLLAPSED=true; applyCollapsed(); }
+  toggleMic();
+}
+$('voiceBtn').onclick=startVoiceMemo;
 (function(){
   var p=$('vidPanel'), h=$('vidHead'), drag=false, ox=0, oy=0;
   h.addEventListener('mousedown', function(e){
