@@ -1028,30 +1028,44 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, micBase='';
+var recog=null, recognizing=false, wantRec=false, micBase0='', micCommitted='';
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
 }
+/* 폰 음성인식 중복 방지:
+   continuous=false(한 마디씩 깔끔히 확정) + onend 자동 재시작(끊김 없이 이어짐)
+   + resultIndex 이후의 확정분만 커밋(누적 중복 제거). interim은 미리보기로만 표시. */
+function _micStart(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recog=new SR();
+  recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
+  recog.continuous=false; recog.interimResults=true; recog.maxAlternatives=1;
+  recog.onstart=function(){ recognizing=true; setMicUI(true); };
+  recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); } };
+  recog.onresult=function(e){
+    var interim='', lastFinal='';
+    for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) lastFinal=t; else interim+=t; }
+    var f=(lastFinal||'').trim();
+    if(f){ micCommitted = micCommitted ? (micCommitted.replace(/\s+$/,'')+' '+f) : f; }
+    var it=interim.trim();
+    contentEl.value = micBase0 + micCommitted + (it ? (micCommitted?' ':'')+it : '');
+    contentEl.dispatchEvent(new Event('input'));
+  };
+  recog.onend=function(){
+    if(wantRec){ setTimeout(function(){ if(wantRec) _micStart(); }, 150); }
+    else { recognizing=false; setMicUI(false); }
+  };
+  try{ recog.start(); }catch(e){}
+}
 function toggleMic(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
-  if(recognizing){ try{ recog.stop(); }catch(e){} return; }
+  if(recognizing||wantRec){ wantRec=false; try{ recog.stop(); }catch(e){} recognizing=false; setMicUI(false); return; }
   if(!currentId){ newNote(); }
-  recog=new SR();
-  recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
-  recog.continuous=true; recog.interimResults=true;
-  micBase=contentEl.value; if(micBase && !/\n$/.test(micBase)) micBase+='\n';
-  recog.onstart=function(){ recognizing=true; setMicUI(true); };
-  recog.onend=function(){ recognizing=false; setMicUI(false); };
-  recog.onerror=function(ev){ recognizing=false; setMicUI(false); if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')) showToast('마이크 권한을 허용해 주세요'); };
-  recog.onresult=function(e){
-    var full='';
-    for(var i=0;i<e.results.length;i++){ full+=e.results[i][0].transcript; }
-    contentEl.value=micBase+full;
-    contentEl.dispatchEvent(new Event('input'));
-  };
-  try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
+  micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
+  micCommitted=''; wantRec=true;
+  _micStart();
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
