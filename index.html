@@ -1043,31 +1043,51 @@ function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
 }
-/* 폰 음성인식: 권한을 처음 한 번만 묻도록 한 세션(continuous)으로 이어가고,
-   폰이 조각을 접두사처럼 여러 번 확정해도 겹치지 않게 '접두사 접기'로 정리.
-   드물게 세션이 끊기면(긴 침묵) 지금까지 내용을 base로 옮겨 이어붙임. */
+/* 폰 음성인식 — 목표: 권한은 처음 한 번만, 멈출 때까지 계속 받아쓰기.
+   방법: (1) getUserMedia로 마이크 권한을 한 번 확보(그 뒤 재요청 안 함)
+         (2) 같은 인식기를 재사용해 이어듣기(끊기면 recog.start만 다시 호출 — new 안 함)
+         (3) 접두사 접기로 겹침 제거. 멈출 때 스트림·인식 모두 해제. */
 function _micRebuild(e){
   var arr=[]; for(var i=0;i<e.results.length;i++){ var s=(e.results[i][0].transcript||'').trim(); if(s) arr.push(s); }
   var kept=[]; for(var k=0;k<arr.length;k++){ if(k+1<arr.length && arr[k+1].indexOf(arr[k])===0) continue; kept.push(arr[k]); }
   contentEl.value = micBase0 + kept.join(' ');
   contentEl.dispatchEvent(new Event('input'));
 }
-function toggleMic(){
+function _micStopAll(){
+  wantRec=false; recognizing=false;
+  try{ if(recog) recog.stop(); }catch(e){}
+  setMicUI(false);
+}
+function _micBegin(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
-  if(recognizing||wantRec){ wantRec=false; try{ recog.stop(); }catch(e){} recognizing=false; setMicUI(false); return; }
-  if(!currentId){ newNote(); }
-  micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
-  try{ contentEl.focus(); }catch(e){}
-  wantRec=true;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
   recog.continuous=true; recog.interimResults=true; recog.maxAlternatives=1;
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
-  recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); } };
+  recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ _micStopAll(); showToast('마이크 권한을 허용해 주세요'); } };
   recog.onresult=_micRebuild;
-  recog.onend=function(){ recognizing=false; wantRec=false; setMicUI(false); };
-  try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
+  recog.onend=function(){
+    if(wantRec){ /* 멈춤 요청 전이면 같은 인식기로 이어듣기(권한 재요청 없음) */
+      micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';
+      try{ recog.start(); }catch(e){ setTimeout(function(){ if(wantRec){ try{ recog.start(); }catch(_){} } }, 250); }
+    } else { recognizing=false; setMicUI(false); }
+  };
+  try{ recog.start(); }catch(e){}
+}
+function toggleMic(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
+  if(recognizing||wantRec){ _micStopAll(); return; }
+  if(!currentId){ newNote(); }
+  micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
+  try{ contentEl.focus(); }catch(e){}
+  wantRec=true;
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      try{ stream.getTracks().forEach(function(t){t.stop();}); }catch(e){}  /* 권한만 확보하고 즉시 해제 → 인식 마이크와 충돌 방지 */
+      _micBegin();
+    }).catch(function(){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); });
+  } else { _micBegin(); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
