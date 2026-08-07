@@ -253,7 +253,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v12</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v13</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -1060,7 +1060,7 @@ function _micBuild(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
-  recog.interimResults=false; recog.continuous=true;
+  recog.interimResults=true; recog.continuous=true;
   recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); _micDbg('onstart — 듣기 시작'); };
   recog.onresult=function(e){
     for(var i=e.resultIndex;i<e.results.length;i++){
@@ -1101,17 +1101,10 @@ function toggleMic(){
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
-  wantRec=true; micShouldRestart=true; _micDbg('탭 — 시작 요청');
-  function startRecog(){ try{ _micBuild(); recog.start(); _micDbg('recog.start() 호출'); }catch(e){ wantRec=false; micShouldRestart=false; setMicUI(false); _micDbg('start 예외: '+e); showToast('다시 한 번 눌러 주세요'); } }
-  /* CGO 검증 방식: 마이크 스트림을 1회 확보해 '계속 유지'(정지 안 함) → 브라우저가 이미 허용됨으로 인식 → 재시작해도 권한 재요청 없음 */
-  if(window._micStream){ _micDbg('스트림 보유 → 바로 시작'); startRecog(); }
-  else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-    _micDbg('getUserMedia 권한 요청…');
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      window._micStream=stream;   /* ★ 스트림 유지(정지하지 않음) */
-      _micDbg('권한 OK · 스트림 확보'); startRecog();
-    }).catch(function(err){ wantRec=false; micShouldRestart=false; setMicUI(false); _micDbg('권한 거부: '+(err&&err.name)); showToast('마이크를 켜고 다시 눌러 주세요'); });
-  } else { startRecog(); }
+  wantRec=true; micShouldRestart=true;
+  /* 음성이 되던 그 방식으로 복귀: 누르는 즉시 바로 인식 시작(권한은 여러 번 뜰 수 있지만 받아쓰기는 됨) */
+  try{ _micBuild(); recog.start(); }
+  catch(e){ wantRec=false; micShouldRestart=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
