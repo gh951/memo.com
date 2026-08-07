@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>메모장</title>
+<!-- 링크 미리보기(카톡·문자·SNS): preview.jpeg를 index.html과 같은 위치에 올리면 자동 표시 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="메모장 C-61">
+<meta property="og:description" content="서버 없이 내 기기에만 저장되는 무료 메모장 — 빠르게 적고, 말로 받아쓰고, 검색으로 찾기.">
+<meta property="og:image" content="https://xn--sp5btl31b.com/preview.jpeg">
+<meta property="og:url" content="https://xn--sp5btl31b.com">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="메모장 C-61">
+<meta name="twitter:description" content="서버 없이 내 기기에만 저장되는 무료 메모장.">
+<meta name="twitter:image" content="https://xn--sp5btl31b.com/preview.jpeg">
 <style>
   :root{
     --bg:#ffffff; --panel:#f8fafc; --line:#e8ecf2;
@@ -1055,10 +1065,7 @@ function toggleMic(){
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); } };
   recog.onresult=_micRebuild;
-  recog.onend=function(){
-    if(wantRec){ micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' '; try{ recog.start(); }catch(e){} }
-    else { recognizing=false; setMicUI(false); }
-  };
+  recog.onend=function(){ recognizing=false; wantRec=false; setMicUI(false); };
   try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
 }
 $('micBtn').onclick=toggleMic;
