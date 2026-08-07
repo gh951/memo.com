@@ -253,7 +253,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v13</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v15</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -1063,19 +1063,11 @@ function _micBuild(){
   recog.interimResults=true; recog.continuous=true;
   recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); _micDbg('onstart — 듣기 시작'); };
   recog.onresult=function(e){
-    for(var i=e.resultIndex;i<e.results.length;i++){
-      var txt=(e.results[i][0].transcript||'').trim(); if(!txt) continue;
-      _micDbg((e.results[i].isFinal?'확정: ':'중간: ')+txt);
-      if(!e.results[i].isFinal){
-        contentEl.value = micBase0 + micCommitted + (micCommitted?' ':'') + txt;
-      } else {
-        if(micCommitted && txt.indexOf(micCommitted)===0){ micCommitted=txt; }           /* 접두사 성장 → 대체 */
-        else if(micCommitted && micCommitted.indexOf(txt)===0){ /* 이미 포함 → 무시 */ }
-        else { micCommitted = micCommitted ? (micCommitted+' '+txt) : txt; }
-        contentEl.value = micBase0 + micCommitted;
-      }
-      contentEl.dispatchEvent(new Event('input'));
-    }
+    var interim='', fin='';
+    for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else interim+=t; }
+    if(fin){ micCommitted += fin; }
+    contentEl.value = micBase0 + micCommitted + interim;
+    contentEl.dispatchEvent(new Event('input'));
   };
   recog.onerror=function(ev){
     var er=ev&&ev.error; _micDbg('onerror: '+er);
@@ -1083,10 +1075,10 @@ function _micBuild(){
     else if(er==='aborted'){ micShouldRestart=false; }   /* 안드로이드 권한 반복 루프 차단 */
   };
   recog.onend=function(){
-    recognizing=false; _micDbg('onend'+(wantRec&&micShouldRestart?' → 1초 뒤 재시작':' (멈춤)'));
+    recognizing=false;
     if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
     setTimeout(function(){
-      if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); _micDbg('재시작 호출'); }catch(e){ _micDbg('재시작 실패: '+e); } }
+      if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} }
     }, 1000);
   };
 }
