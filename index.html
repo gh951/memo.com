@@ -253,7 +253,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v11</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v12</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -1055,12 +1055,12 @@ function setMicUI(on){
    (4) aborted 에러면 재시작 금지(안드로이드 권한 반복 루프 차단).
    (5) resultIndex 이후 확정분만 반영 + 접두사 대체로 겹침 제거.
    ※ 카톡 등 인앱 브라우저는 재시작마다 권한을 다시 물을 수 있음 → 크롬으로 열면 한 번만. */
-function _micDbg(s){ var d=$('micDbg'); if(!d) return; d.style.display='block'; var t=new Date(); var ts=('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2); d.textContent = (ts+'  '+s+'\n'+d.textContent).split('\n').slice(0,8).join('\n'); }
+function _micDbg(s){ /* 디버그 표시 끔 */ }
 function _micBuild(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
-  recog.interimResults=true; recog.continuous=true;
+  recog.interimResults=false; recog.continuous=true;
   recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); _micDbg('onstart — 듣기 시작'); };
   recog.onresult=function(e){
     for(var i=e.resultIndex;i<e.results.length;i++){
