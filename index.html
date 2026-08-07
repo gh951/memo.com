@@ -1038,63 +1038,77 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, wantRec=false, micBase0='', micCommitted='';
+var recog=null, recognizing=false, wantRec=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='';
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
 }
-/* 폰 음성인식 — 목표: 권한은 처음 한 번만, 멈출 때까지 계속 받아쓰기.
-   방법: (1) getUserMedia로 마이크 권한을 한 번 확보(그 뒤 재요청 안 함)
-         (2) 같은 인식기를 재사용해 이어듣기(끊기면 recog.start만 다시 호출 — new 안 함)
-         (3) 접두사 접기로 겹침 제거. 멈출 때 스트림·인식 모두 해제. */
-function _micRebuild(e){
-  var arr=[]; for(var i=0;i<e.results.length;i++){ var s=(e.results[i][0].transcript||'').trim(); if(s) arr.push(s); }
-  var kept=[]; for(var k=0;k<arr.length;k++){ if(k+1<arr.length && arr[k+1].indexOf(arr[k])===0) continue; kept.push(arr[k]); }
-  contentEl.value = micBase0 + kept.join(' ');
-  contentEl.dispatchEvent(new Event('input'));
-}
-function _micStopAll(){
-  wantRec=false; recognizing=false;
-  try{ if(recog) recog.stop(); }catch(e){}
-  setMicUI(false);
-}
-function _micBegin(){
+/* 폰 음성인식 — CGO(cgo-message) 검증 방식 이식:
+   (1) getUserMedia로 마이크 스트림을 잡고 '계속 유지'(정지 안 함) → 브라우저가 '이미 허용됨'으로 인식,
+       재시작해도 권한을 다시 안 물음.
+   (2) continuous 이어듣기 + onend에서 1초 뒤 안전 재시작(중복 start 방지).
+   (3) aborted 에러면 재시작 금지(안드로이드 권한 반복 루프 차단).
+   (4) resultIndex 이후 확정분만 반영 + 접두사 대체로 겹침 제거. 스트림은 앱 나갈 때만 해제. */
+function _micBuild(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
-  recog.continuous=true; recog.interimResults=true; recog.maxAlternatives=1;
-  recog.onstart=function(){ recognizing=true; setMicUI(true); };
-  recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ _micStopAll(); showToast('마이크 권한을 허용해 주세요'); } };
-  recog.onresult=_micRebuild;
-  recog.onend=function(){
-    if(wantRec){ /* 멈춤 요청 전이면 같은 인식기로 이어듣기(권한 재요청 없음) */
-      micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';
-      try{ recog.start(); }catch(e){ setTimeout(function(){ if(wantRec){ try{ recog.start(); }catch(_){} } }, 250); }
-    } else { recognizing=false; setMicUI(false); }
+  recog.interimResults=true; recog.continuous=true;
+  recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); };
+  recog.onresult=function(e){
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      var txt=(e.results[i][0].transcript||'').trim(); if(!txt) continue;
+      if(!e.results[i].isFinal){
+        contentEl.value = micBase0 + micCommitted + (micCommitted?' ':'') + txt;
+      } else {
+        if(micCommitted && txt.indexOf(micCommitted)===0){ micCommitted=txt; }           /* 접두사 성장 → 대체 */
+        else if(micCommitted && micCommitted.indexOf(txt)===0){ /* 이미 포함 → 무시 */ }
+        else { micCommitted = micCommitted ? (micCommitted+' '+txt) : txt; }
+        contentEl.value = micBase0 + micCommitted;
+      }
+      contentEl.dispatchEvent(new Event('input'));
+    }
   };
-  try{ recog.start(); }catch(e){}
+  recog.onerror=function(ev){
+    var er=ev&&ev.error;
+    if(er==='not-allowed'||er==='service-not-allowed'||er==='audio-capture'){ wantRec=false; micShouldRestart=false; recognizing=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); }
+    else if(er==='aborted'){ micShouldRestart=false; }   /* 안드로이드 권한 반복 루프 차단 */
+  };
+  recog.onend=function(){
+    recognizing=false;
+    if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
+    setTimeout(function(){
+      if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} }
+    }, 1000);
+  };
 }
 function toggleMic(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
-  if(recognizing||wantRec){ _micStopAll(); return; }
+  if(wantRec){ /* 멈춤 (마이크 스트림은 다음을 위해 유지) */
+    wantRec=false; micShouldRestart=false;
+    try{ if(recog) recog.stop(); }catch(e){}
+    setMicUI(false); return;
+  }
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
-  try{ contentEl.focus(); }catch(e){}
-  wantRec=true;
-  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+  micCommitted=''; try{ contentEl.focus(); }catch(e){}
+  wantRec=true; micShouldRestart=true;
+  function go(){ try{ _micBuild(); recog.start(); }catch(e){ wantRec=false; micShouldRestart=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); } }
+  if(window._micStream){ go(); }                       /* 이미 스트림 보유 → 권한 재요청 없이 시작 */
+  else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      try{ stream.getTracks().forEach(function(t){t.stop();}); }catch(e){}  /* 권한만 확보하고 즉시 해제 → 인식 마이크와 충돌 방지 */
-      _micBegin();
-    }).catch(function(){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); });
-  } else { _micBegin(); }
+      window._micStream=stream;   /* ★ 스트림 유지(정지 안 함) → 권한 유지 */
+      go();
+    }).catch(function(){ wantRec=false; micShouldRestart=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); });
+  } else { go(); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
 function startVoiceMemo(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
-  if(recognizing){ try{ recog.stop(); }catch(e){} return; }
+  if(wantRec){ toggleMic(); return; }   /* 이미 받아쓰는 중이면 멈춤 */
   setFolder('voice'); newNote();
   if(window.innerWidth<=640){ COLLAPSED=true; applyCollapsed(); }
   toggleMic();
