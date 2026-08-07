@@ -1058,6 +1058,7 @@ function toggleMic(){
   if(recognizing||wantRec){ wantRec=false; try{ recog.stop(); }catch(e){} recognizing=false; setMicUI(false); return; }
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
+  try{ contentEl.focus(); }catch(e){}
   wantRec=true;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
@@ -1065,7 +1066,12 @@ function toggleMic(){
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onerror=function(ev){ if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){ wantRec=false; recognizing=false; setMicUI(false); showToast('마이크 권한을 허용해 주세요'); } };
   recog.onresult=_micRebuild;
-  recog.onend=function(){ recognizing=false; wantRec=false; setMicUI(false); };
+  recog.onend=function(){
+    if(wantRec){ /* 사용자가 멈추기 전까지 계속 이어듣기 (이전 내용 보존) */
+      micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';
+      try{ recog.start(); }catch(e){ setTimeout(function(){ if(wantRec){ try{ recog.start(); }catch(_){} } }, 250); }
+    } else { recognizing=false; setMicUI(false); }
+  };
   try{ recog.start(); }catch(e){ showToast('음성 받아쓰기를 시작할 수 없어요'); }
 }
 $('micBtn').onclick=toggleMic;
