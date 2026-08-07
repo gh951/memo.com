@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>메모장</title>
@@ -250,7 +253,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v11</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -433,6 +436,8 @@
     </div>
   </div>
 </div>
+
+<div id="micDbg" style="position:fixed; left:6px; right:6px; bottom:6px; z-index:400; background:rgba(18,20,26,.92); color:#7fe3c0; font:11px/1.45 monospace; padding:7px 9px; border-radius:9px; max-height:130px; overflow:auto; white-space:pre-wrap; display:none;"></div>
 
 <script>
 'use strict';
@@ -1050,15 +1055,17 @@ function setMicUI(on){
    (4) aborted 에러면 재시작 금지(안드로이드 권한 반복 루프 차단).
    (5) resultIndex 이후 확정분만 반영 + 접두사 대체로 겹침 제거.
    ※ 카톡 등 인앱 브라우저는 재시작마다 권한을 다시 물을 수 있음 → 크롬으로 열면 한 번만. */
+function _micDbg(s){ var d=$('micDbg'); if(!d) return; d.style.display='block'; var t=new Date(); var ts=('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2); d.textContent = (ts+'  '+s+'\n'+d.textContent).split('\n').slice(0,8).join('\n'); }
 function _micBuild(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
   recog.interimResults=true; recog.continuous=true;
-  recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); showToast('🎤 듣고 있어요 — 말하면 적혀요'); };
+  recog.onstart=function(){ recognizing=true; micAbort=0; setMicUI(true); _micDbg('onstart — 듣기 시작'); };
   recog.onresult=function(e){
     for(var i=e.resultIndex;i<e.results.length;i++){
       var txt=(e.results[i][0].transcript||'').trim(); if(!txt) continue;
+      _micDbg((e.results[i].isFinal?'확정: ':'중간: ')+txt);
       if(!e.results[i].isFinal){
         contentEl.value = micBase0 + micCommitted + (micCommitted?' ':'') + txt;
       } else {
@@ -1071,15 +1078,15 @@ function _micBuild(){
     }
   };
   recog.onerror=function(ev){
-    var er=ev&&ev.error;
+    var er=ev&&ev.error; _micDbg('onerror: '+er);
     if(er==='not-allowed'||er==='service-not-allowed'||er==='audio-capture'){ wantRec=false; micShouldRestart=false; recognizing=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); }
     else if(er==='aborted'){ micShouldRestart=false; }   /* 안드로이드 권한 반복 루프 차단 */
   };
   recog.onend=function(){
-    recognizing=false;
+    recognizing=false; _micDbg('onend'+(wantRec&&micShouldRestart?' → 1초 뒤 재시작':' (멈춤)'));
     if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
     setTimeout(function(){
-      if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} }
+      if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); _micDbg('재시작 호출'); }catch(e){ _micDbg('재시작 실패: '+e); } }
     }, 1000);
   };
 }
@@ -1087,22 +1094,23 @@ function toggleMic(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
   if(wantRec){ /* 멈춤 (마이크 스트림은 다음을 위해 유지 → 다시 눌러도 권한 재요청 없음) */
-    wantRec=false; micShouldRestart=false;
+    wantRec=false; micShouldRestart=false; _micDbg('멈춤 요청');
     try{ if(recog) recog.stop(); }catch(e){}
     setMicUI(false); return;
   }
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
-  wantRec=true; micShouldRestart=true;
-  function startRecog(){ try{ _micBuild(); recog.start(); }catch(e){ wantRec=false; micShouldRestart=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); } }
+  wantRec=true; micShouldRestart=true; _micDbg('탭 — 시작 요청');
+  function startRecog(){ try{ _micBuild(); recog.start(); _micDbg('recog.start() 호출'); }catch(e){ wantRec=false; micShouldRestart=false; setMicUI(false); _micDbg('start 예외: '+e); showToast('다시 한 번 눌러 주세요'); } }
   /* CGO 검증 방식: 마이크 스트림을 1회 확보해 '계속 유지'(정지 안 함) → 브라우저가 이미 허용됨으로 인식 → 재시작해도 권한 재요청 없음 */
-  if(window._micStream){ startRecog(); }
+  if(window._micStream){ _micDbg('스트림 보유 → 바로 시작'); startRecog(); }
   else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    _micDbg('getUserMedia 권한 요청…');
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
       window._micStream=stream;   /* ★ 스트림 유지(정지하지 않음) */
-      startRecog();
-    }).catch(function(){ wantRec=false; micShouldRestart=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); });
+      _micDbg('권한 OK · 스트림 확보'); startRecog();
+    }).catch(function(err){ wantRec=false; micShouldRestart=false; setMicUI(false); _micDbg('권한 거부: '+(err&&err.name)); showToast('마이크를 켜고 다시 눌러 주세요'); });
   } else { startRecog(); }
 }
 $('micBtn').onclick=toggleMic;
