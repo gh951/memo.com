@@ -1116,19 +1116,19 @@ function toggleMic(){
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
   wantRec=true; micShouldRestart=true; setMicUI(true);
-  /* 마이크 스트림을 1회 확보해 계속 살려둔다 → 재시작마다 나던 권한 재요청/'삐' 소리 차단.
-     (브라우저가 '이미 허용됨'으로 인식) */
-  function startRecog(){
+  /* 마이크 스트림을 1회 확보해 계속 살려둔다 → 재시작마다 나던 '삐' 소리 차단.
+     (브라우저가 '이미 허용됨'으로 인식. 받아쓰기 로직은 그대로) */
+  function _startRec(){
     try{ _micBuild(); recog.start(); }
     catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
   }
-  if(micStream){ startRecog(); }              /* 이미 스트림 있으면 바로 시작 */
+  if(micStream){ _startRec(); }
   else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      micStream=stream;                        /* ★ 스트림 유지(정지 안 함) → 권한 유지 → 삐 없음 */
-      startRecog();
-    }).catch(function(){ startRecog(); });     /* 권한 실패해도 일단 시도 */
-  } else { startRecog(); }
+      micStream=stream;   /* ★ 스트림 유지(정지 안 함) → 삐 없음 */
+      _startRec();
+    }).catch(function(){ _startRec(); });
+  } else { _startRec(); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
