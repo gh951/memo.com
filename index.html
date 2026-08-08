@@ -1063,7 +1063,7 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='';
+var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='', sessionFinal='';
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
@@ -1081,18 +1081,16 @@ function _micBuild(){
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
   recog.interimResults=true; recog.continuous=true;
-  recog.onstart=function(){ recognizing=true; setMicUI(true); };
+  recog.onstart=function(){ recognizing=true; sessionFinal=''; setMicUI(true); };
   recog.onresult=function(e){
-    var fin='', interim='';
-    /* 이 세션에서 새로 확정된 것과 임시 결과 분리 */
-    for(var i=e.resultIndex;i<e.results.length;i++){
+    /* 안드로이드 버그 우회: resultIndex를 믿지 않고 항상 0부터 전부 다시 읽어 '교체'(누적 금지) */
+    var finals='', interim='';
+    for(var i=0;i<e.results.length;i++){
       var t=e.results[i][0].transcript;
-      if(e.results[i].isFinal) fin+=t; else interim+=t;
+      if(e.results[i].isFinal) finals+=t; else interim+=t;
     }
-    /* 확정분은 즉시 기본 텍스트에 병합 (재시작해도 중복 안 됨) */
-    if(fin){ micBase0+=fin; }
-    /* 임시 결과는 화면에만 잠깐 표시 */
-    contentEl.value = micBase0 + interim;
+    sessionFinal=finals;                                  /* += 아니라 = (교체) */
+    contentEl.value = micBase0 + sessionFinal + interim;  /* 화면엔 base + 이번세션확정 + 임시 */
     contentEl.dispatchEvent(new Event('input'));
   };
   recog.onerror=function(ev){
@@ -1102,8 +1100,10 @@ function _micBuild(){
   };
   recog.onend=function(){
     recognizing=false;
+    /* 세션 종료: 이번 세션 확정분을 base에 딱 한 번 병합 → 재시작해도 중복 안 됨 */
+    if(sessionFinal){ micBase0+=sessionFinal; sessionFinal=''; }
     if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
-    setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
+    setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 300);
   };
 }
 function toggleMic(){
@@ -1116,7 +1116,7 @@ function toggleMic(){
   }
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
-  micCommitted=''; try{ contentEl.focus(); }catch(e){}
+  micCommitted=''; sessionFinal=''; try{ contentEl.focus(); }catch(e){}
   wantRec=true; micShouldRestart=true; setMicUI(true);
   try{ _micBuild(); recog.start(); }
   catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
