@@ -271,7 +271,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v17</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v19</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -1079,31 +1079,29 @@ function _micBuild(){
   recog=new SR();
   recog.lang=($('micLang')&&$('micLang').value)||navigator.language||'ko-KR';
   recog.interimResults=true; recog.continuous=true;
-  recog.onstart=function(){ recognizing=true; micAbort=0; if(!micPaused) setMicUI(true); };
+  recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onresult=function(e){
-    if(micPaused) return;                 /* 일시정지 중엔 무시 (마이크는 계속 유지) */
     var interim='', fin='';
     for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else interim+=t; }
-    if(fin){ micCommitted += fin; }
+    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); }
     contentEl.value = micBase0 + micCommitted + interim;
     contentEl.dispatchEvent(new Event('input'));
   };
   recog.onerror=function(ev){
     var er=ev&&ev.error;
-    if(er==='not-allowed'||er==='service-not-allowed'||er==='audio-capture'){ micFatal=false; wantRec=false; micShouldRestart=false; recognizing=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); }
-    else if(er==='aborted'){ micShouldRestart=false; }   /* 안드로이드 권한 반복 루프 차단 */
+    if(er==='not-allowed'||er==='service-not-allowed'||er==='audio-capture'){ wantRec=false; micShouldRestart=false; recognizing=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); }
+    else if(er==='aborted'){ micShouldRestart=false; }
   };
   recog.onend=function(){
     recognizing=false;
-    if(micFatal || !wantRec || !micShouldRestart){ return; }
-    /* 무음 등으로 자연 종료된 경우만 1초 뒤 안전 재시작 (마이크 유지 상태라 권한 재요청 없음) */
-    setTimeout(function(){ if(wantRec && !micFatal && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
+    if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
+    setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
   };
 }
 function toggleMic(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('이 브라우저는 음성 받아쓰기를 지원하지 않아요. 크롬·엣지에서 열어 주세요.'); return; }
-  if(wantRec){ /* 멈춤 (마이크 스트림은 유지 → 다시 시작해도 권한 재요청 없음) */
+  if(wantRec){ /* 멈춤 */
     wantRec=false; micShouldRestart=false;
     try{ if(recog) recog.stop(); }catch(e){}
     recognizing=false; setMicUI(false); return;
@@ -1111,15 +1109,9 @@ function toggleMic(){
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
-  micFatal=false; micPaused=false; wantRec=true; micShouldRestart=true; setMicUI(true);
-  function startRecog(){ try{ _micBuild(); recog.start(); }catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); } }
-  if(window._micStream){ startRecog(); }                                       /* 스트림 보유 → 권한 재요청 없이 시작 */
-  else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      window._micStream=stream;   /* ★ 스트림 유지(정지하지 않음) → 권한 유지 */
-      startRecog();
-    }).catch(function(){ wantRec=false; setMicUI(false); showToast('마이크를 켜고 다시 눌러 주세요'); });
-  } else { startRecog(); }
+  wantRec=true; micShouldRestart=true; setMicUI(true);
+  try{ _micBuild(); recog.start(); }
+  catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
