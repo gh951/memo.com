@@ -1061,7 +1061,7 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='';
+var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='', micStream=null;
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
@@ -1099,10 +1099,9 @@ function _micBuild(){
   };
   recog.onend=function(){
     recognizing=false;
-    /* 자동 재시작 제거 → 재시작 때마다 나던 '삐' 소리 없앰. 멈추면 그냥 종료. */
-    micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';
-    wantRec=false; micShouldRestart=false;
-    setMicUI(false);
+    if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
+    micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';   /* 재시작 전 지금까지 완성문 보존 */
+    setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
   };
 }
 function toggleMic(){
@@ -1117,8 +1116,19 @@ function toggleMic(){
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
   wantRec=true; micShouldRestart=true; setMicUI(true);
-  try{ _micBuild(); recog.start(); }
-  catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
+  /* 마이크 스트림을 1회 확보해 계속 살려둔다 → 재시작마다 나던 권한 재요청/'삐' 소리 차단.
+     (브라우저가 '이미 허용됨'으로 인식) */
+  function startRecog(){
+    try{ _micBuild(); recog.start(); }
+    catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
+  }
+  if(micStream){ startRecog(); }              /* 이미 스트림 있으면 바로 시작 */
+  else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      micStream=stream;                        /* ★ 스트림 유지(정지 안 함) → 권한 유지 → 삐 없음 */
+      startRecog();
+    }).catch(function(){ startRecog(); });     /* 권한 실패해도 일단 시도 */
+  } else { startRecog(); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
