@@ -271,7 +271,7 @@
 
 <header>
   <button class="icon-btn" id="toggleSide" title="목록 접기 / 펼치기">☰</button>
-  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v19</span></span>
+  <span class="brand">메모장 <span style="color:#2f6fb0; font-weight:900;">C-61</span> <span style="font-size:10px; font-weight:700; color:#c0663a; vertical-align:super;">v20</span></span>
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
@@ -1061,7 +1061,7 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='', micSeen='';
+var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='';
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
@@ -1081,19 +1081,15 @@ function _micBuild(){
   recog.interimResults=true; recog.continuous=true;
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onresult=function(e){
-    var interim='';
-    for(var i=e.resultIndex;i<e.results.length;i++){
-      var t=e.results[i][0].transcript;
-      if(e.results[i].isFinal){
-        var piece=t.trim();
-        /* 카톡이 재시작마다 확정문을 다시 보내도, 이미 담은 조각이면 건너뜀 */
-        if(piece && micSeen.indexOf('\u0001'+piece+'\u0001')<0){
-          micSeen += '\u0001'+piece+'\u0001';
-          micCommitted += (micCommitted && !/\s$/.test(micCommitted) ? ' ' : '') + piece;
-        }
-      } else { interim+=t; }
+    var finals=[], interim='';
+    for(var i=0;i<e.results.length;i++){
+      var t=(e.results[i][0].transcript||'').trim(); if(!t) continue;
+      if(e.results[i].isFinal) finals.push(t); else interim=t;
     }
-    contentEl.value = micBase0 + micCommitted + (interim ? (micCommitted?' ':'')+interim : '');
+    var kept=[];
+    for(var k=0;k<finals.length;k++){ if(k+1<finals.length && finals[k+1].indexOf(finals[k])===0) continue; kept.push(finals[k]); }
+    var done=kept.join(' ');
+    contentEl.value = micBase0 + done + (interim ? (done?' ':'')+interim : '');
     contentEl.dispatchEvent(new Event('input'));
   };
   recog.onerror=function(ev){
@@ -1104,6 +1100,7 @@ function _micBuild(){
   recog.onend=function(){
     recognizing=false;
     if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
+    micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';   /* 재시작 전 지금까지 완성문 보존 */
     setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
   };
 }
@@ -1117,7 +1114,7 @@ function toggleMic(){
   }
   if(!currentId){ newNote(); }
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
-  micCommitted=''; micSeen=''; try{ contentEl.focus(); }catch(e){}
+  micCommitted=''; try{ contentEl.focus(); }catch(e){}
   wantRec=true; micShouldRestart=true; setMicUI(true);
   try{ _micBuild(); recog.start(); }
   catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
@@ -1244,7 +1241,7 @@ openDB().then(dbGetAll).then(function(all){
   renderFolders(); renderFolderSelect(); renderList();
   var inFolder=notes.filter(function(n){return curFolder==='__all__'?true:folderOf(n)===curFolder;});
   if(inFolder.length){ openNote(inFolder.sort(function(a,b){return b.updated-a.updated;})[0].id); }
-  monthlyAutoJs();
+  /* monthlyAutoJs(); ← 페이지 열 때 자동 다운로드 끔 (전체 백업 버튼으로만 저장) */
 }).catch(function(e){
   listEl.innerHTML='<div class="empty-list">저장소를 열 수 없어요.<br>브라우저 설정(시크릿 모드 등)을 확인해 주세요.</div>';
 });
