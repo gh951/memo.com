@@ -1085,9 +1085,7 @@ function _micBuild(){
   recog.onresult=function(e){
     var interim='', fin='';
     for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else interim+=t; }
-    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); micLastFinal=e.results.length-1; }
-    /* 마지막 임시 결과만 표시 */
-    if(!fin && e.results.length>0){ var last=e.results[e.results.length-1]; interim=last[0].transcript; }
+    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); }
     contentEl.value = micBase0 + micCommitted + interim;
     contentEl.dispatchEvent(new Event('input'));
   };
