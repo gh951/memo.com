@@ -1099,9 +1099,10 @@ function _micBuild(){
   };
   recog.onend=function(){
     recognizing=false;
-    if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
-    micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';   /* 재시작 전 지금까지 완성문 보존 */
-    setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
+    /* 자동 재시작 제거 → 재시작 때마다 나던 '삐' 소리 없앰. 멈추면 그냥 종료. */
+    micBase0=contentEl.value; if(micBase0 && !/\s$/.test(micBase0)) micBase0+=' ';
+    wantRec=false; micShouldRestart=false;
+    setMicUI(false);
   };
 }
 function toggleMic(){
