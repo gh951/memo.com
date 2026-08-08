@@ -1095,6 +1095,8 @@ function _micBuild(){
   recog.onend=function(){
     recognizing=false;
     if(!wantRec || !micShouldRestart){ setMicUI(false); return; }
+    /* 재시작 전 완성문을 기본값으로 병합 → 완성된 마디만 남기고 임시 텍스트는 버림 */
+    if(micCommitted){ micBase0 += micCommitted; micCommitted=''; }
     setTimeout(function(){ if(wantRec && micShouldRestart && !recognizing && recog){ try{ recog.start(); }catch(e){} } }, 1000);
   };
 }
@@ -1235,7 +1237,7 @@ openDB().then(dbGetAll).then(function(all){
   renderFolders(); renderFolderSelect(); renderList();
   var inFolder=notes.filter(function(n){return curFolder==='__all__'?true:folderOf(n)===curFolder;});
   if(inFolder.length){ openNote(inFolder.sort(function(a,b){return b.updated-a.updated;})[0].id); }
-  monthlyAutoJs();
+  // monthlyAutoJs(); /* 자동 다운로드 비활성화 */
 }).catch(function(e){
   listEl.innerHTML='<div class="empty-list">저장소를 열 수 없어요.<br>브라우저 설정(시크릿 모드 등)을 확인해 주세요.</div>';
 });
