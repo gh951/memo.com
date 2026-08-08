@@ -1061,7 +1061,7 @@ $('pinBtn').onclick=openMemoPiP;
 $('pipAwayBack').onclick=function(){ try{ if(window._memoPip) window._memoPip.close(); }catch(e){} $('pipAway').style.display='none'; };
 
 /* 🎤 음성 받아쓰기 — 브라우저 내장(Web Speech API), 비용 0. 받아쓰는 순간만 온라인. 언어 미지정 시 기기 언어 */
-var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='', micStream=null;
+var recog=null, recognizing=false, wantRec=false, micPaused=false, micFatal=false, micShouldRestart=false, micAbort=0, micBase0='', micCommitted='';
 function setMicUI(on){
   var b=$('micBtn'); if(b){ b.textContent=on?'⏺ 받아쓰는 중…(누르면 멈춤)':'🎤 받아쓰기'; b.style.color=on?'#b4453a':''; b.style.fontWeight=on?'800':''; b.classList.toggle('rec',on); }
   var v=$('voiceBtn'); if(v){ v.textContent=on?'⏺ 듣는 중…(누르면 멈춤)':'🎤 음성 메모'; v.classList.toggle('rec',on); v.style.color=on?'#fff':''; }
@@ -1116,19 +1116,8 @@ function toggleMic(){
   micBase0=contentEl.value; if(micBase0 && !/\n$/.test(micBase0)) micBase0+='\n';
   micCommitted=''; try{ contentEl.focus(); }catch(e){}
   wantRec=true; micShouldRestart=true; setMicUI(true);
-  /* 마이크 스트림을 1회 확보해 계속 살려둔다 → 재시작마다 나던 '삐' 소리 차단.
-     (브라우저가 '이미 허용됨'으로 인식. 받아쓰기 로직은 그대로) */
-  function _startRec(){
-    try{ _micBuild(); recog.start(); }
-    catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
-  }
-  if(micStream){ _startRec(); }
-  else if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      micStream=stream;   /* ★ 스트림 유지(정지 안 함) → 삐 없음 */
-      _startRec();
-    }).catch(function(){ _startRec(); });
-  } else { _startRec(); }
+  try{ _micBuild(); recog.start(); }
+  catch(e){ wantRec=false; setMicUI(false); showToast('다시 한 번 눌러 주세요'); }
 }
 $('micBtn').onclick=toggleMic;
 /* 🎤 음성 메모 버튼 하나로: 새 음성 메모 열고 → 바로 받아쓰기 시작 (다시 누르면 멈춤) */
