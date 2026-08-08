@@ -1083,14 +1083,16 @@ function _micBuild(){
   recog.interimResults=true; recog.continuous=true;
   recog.onstart=function(){ recognizing=true; setMicUI(true); };
   recog.onresult=function(e){
-    var fin='';
-    /* 확정된 결과만 누적 */
-    for(var i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) fin+=e.results[i][0].transcript; }
-    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); }
-    /* 마지막 임시 결과만 표시 */
-    var interim='';
-    if(e.results.length>0 && !e.results[e.results.length-1].isFinal){ interim=e.results[e.results.length-1][0].transcript; }
-    contentEl.value = micBase0 + micCommitted + interim;
+    var fin='', interim='';
+    /* 이 세션에서 새로 확정된 것과 임시 결과 분리 */
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      var t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) fin+=t; else interim+=t;
+    }
+    /* 확정분은 즉시 기본 텍스트에 병합 (재시작해도 중복 안 됨) */
+    if(fin){ micBase0+=fin; }
+    /* 임시 결과는 화면에만 잠깐 표시 */
+    contentEl.value = micBase0 + interim;
     contentEl.dispatchEvent(new Event('input'));
   };
   recog.onerror=function(ev){
