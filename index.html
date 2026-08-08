@@ -275,6 +275,7 @@
   <div class="spacer"></div>
   <button class="icon-btn show-sm" id="moreBtn" title="더보기">⋯</button>
   <div id="hdrTools" class="hdr-tools">
+  <button class="icon-btn" id="refreshBtn" title="새로고침">🔄</button>
   <button class="icon-btn" id="calcBtn" title="계산기">🧮</button>
   <button class="icon-btn" id="lockBtn" title="잠금 설정">🔒</button>
   <button class="icon-btn" id="vidBtn" title="영상 보며 메모 (유튜브·내 영상)">📺</button>
@@ -967,6 +968,7 @@ function calcEvalSafe(src){
 function calcTok(s){ var t=[],i=0; while(i<s.length){ var c=s[i]; if(c===' '){i++;continue;} if(/[0-9.]/.test(c)){ var j=i+1; while(j<s.length&&/[0-9.]/.test(s[j]))j++; t.push({n:parseFloat(s.slice(i,j))}); i=j; continue; } if(c==='π'){ t.push({id:'π'}); i++; continue; } if(/[a-z]/i.test(c)){ var k=i+1; while(k<s.length&&/[a-z]/i.test(s[k]))k++; t.push({id:s.slice(i,k).toLowerCase()}); i=k; continue; } if('+-*/^()!%'.indexOf(c)>=0){ t.push(c); i++; continue; } throw 0; } return t; }
 function cfn(id,a){ var R=cDeg?Math.PI/180:1; if(id==='sin')return Math.sin(a*R); if(id==='cos')return Math.cos(a*R); if(id==='tan')return Math.tan(a*R); if(id==='asin')return Math.asin(a)/R; if(id==='acos')return Math.acos(a)/R; if(id==='atan')return Math.atan(a)/R; if(id==='sqrt')return Math.sqrt(a); if(id==='ln')return Math.log(a); if(id==='log')return Math.log10(a); if(id==='exp')return Math.exp(a); if(id==='abs')return Math.abs(a); throw 0; }
 function cfact(n){ if(n<0||n!==Math.floor(n))return NaN; var r=1; for(var k=2;k<=n;k++)r*=k; return r; }
+$('refreshBtn').onclick=function(){ location.reload(); };
 $('calcBtn').onclick=function(){ calcModal.style.display='flex'; calcShow(); };
 $('calcClose').onclick=function(){ calcModal.style.display='none'; };
 $('degRad').onclick=function(){ cDeg=!cDeg; $('degRad').textContent=cDeg?'DEG':'RAD'; calcShow(); };
@@ -1083,7 +1085,9 @@ function _micBuild(){
   recog.onresult=function(e){
     var interim='', fin='';
     for(var i=e.resultIndex;i<e.results.length;i++){ var t=e.results[i][0].transcript; if(e.results[i].isFinal) fin+=t; else interim+=t; }
-    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); }
+    if(fin){ micCommitted += fin; showToast('들림: '+fin.trim().slice(0,24)); micLastFinal=e.results.length-1; }
+    /* 마지막 임시 결과만 표시 */
+    if(!fin && e.results.length>0){ var last=e.results[e.results.length-1]; interim=last[0].transcript; }
     contentEl.value = micBase0 + micCommitted + interim;
     contentEl.dispatchEvent(new Event('input'));
   };
